@@ -16,4 +16,10 @@ lto = false
 codegen-units = 1
 opt-level = "z"
 strip = true
-panic = "unwind"
+# panic = "abort" instead of "unwind": with LTO disabled, the duplicated
+# CFI entries Rust emits across crates make Xcode 26's ld_prime hit
+# `findRealAtom` and ld_classic hit `cfiStartsArray`. Aborting on panic
+# drops the eh_frame tables Rust would otherwise generate, and the
+# remaining compact-unwind metadata is what the Apple linker actually
+# expects. Mobile apps panic-abort either way.
+panic = "abort"
