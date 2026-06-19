@@ -77,6 +77,14 @@ jobs:
 
       - name: Cross-compile all targets via craby
         run: yarn craby build
+        env:
+          # Disable LTO in the release profile. The workspace's [profile.release]
+          # sets lto = true, which makes cc-rs emit LLVM bitcode for C objects
+          # (e.g. libz-sys's zlib). Android NDK's llvm-strip can't process the
+          # bitcode and bails on the first such member ("adler32.o: not
+          # recognized as a valid object file"). Disabling LTO keeps the C
+          # objects as plain native ELF so the strip step succeeds.
+          CARGO_PROFILE_RELEASE_LTO: "false"
 
       - name: Upload Android prebuilts
         uses: actions/upload-artifact@v4
