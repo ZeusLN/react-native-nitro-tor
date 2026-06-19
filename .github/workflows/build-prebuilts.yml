@@ -94,43 +94,33 @@ jobs:
           CFLAGS_i686_linux_android: "-fno-lto"
           CFLAGS_x86_64_linux_android: "-fno-lto"
 
-      - name: Diagnose adler32.o
+      - name: Diagnose adler32.o source archive
         if: always()
         run: |
           set +e
           NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
-          AAR="target/aarch64-linux-android/release/libreactnativenitrotor.a"
-          if [ ! -f "$AAR" ]; then
-            echo "no archive at $AAR"
-            exit 0
-          fi
-          ls -la "$AAR"
-          mkdir -p /tmp/extract
-          cd /tmp/extract
-          # Use absolute path so cd above doesn't matter.
-          "$NDK_BIN/llvm-ar" t "$GITHUB_WORKSPACE/$AAR" | grep -i adler
-          echo
-          echo "=== Extracting adler32.o ==="
-          "$NDK_BIN/llvm-ar" x "$GITHUB_WORKSPACE/$AAR" adler32.o adler32_simd.o
-          ls -la
-          echo
-          for ofile in adler32.o adler32_simd.o; do
-            [ -f "$ofile" ] || continue
-            echo "=== $ofile ==="
-            echo "--- file ---"
-            file "$ofile"
-            echo "--- first 64 bytes ---"
-            xxd "$ofile" | head -4
-            echo "--- llvm-objdump --file-headers ---"
-            "$NDK_BIN/llvm-objdump" --file-headers "$ofile" 2>&1 | head -10
-            echo "--- llvm-nm (symbols) ---"
-            "$NDK_BIN/llvm-nm" "$ofile" 2>&1 | head -10
-            echo
+          AR="$NDK_BIN/llvm-ar"
+          TARGET_DIR="target/aarch64-linux-android/release"
+          echo "=== Searching all .a archives for adler32.o membership ==="
+          find target/aarch64-linux-android -name '*.a' 2>/dev/null | while read a; do
+            if "$AR" t "$a" 2>/dev/null | grep -qE '^adler32(_simd)?\.o$'; then
+              echo "HIT: $a"
+              "$AR" t "$a" | grep adler
+              echo
+            fi
           done
-          echo "=== sample of all member names ==="
-          "$NDK_BIN/llvm-ar" t "$GITHUB_WORKSPACE/$AAR" | head -30
-          echo "..."
-          "$NDK_BIN/llvm-ar" t "$GITHUB_WORKSPACE/$AAR" | wc -l
+          echo
+          echo "=== libz-sys-* build out dir contents ==="
+          for d in $(find "$TARGET_DIR/build" -maxdepth 1 -type d -name 'libz-sys-*' 2>/dev/null); do
+            echo "-- $d --"
+            find "$d" -maxdepth 4 -name '*.a' -o -name 'adler32*.o' 2>/dev/null
+          done
+          echo
+          echo "=== libtor-sys-* / libtor-src-* / libevent-src-* / openssl-sys-* build out for any .a ==="
+          for d in $(find "$TARGET_DIR/build" -maxdepth 1 -type d \( -name 'libtor-sys-*' -o -name 'libtor-src-*' -o -name 'libevent-src-*' -o -name 'openssl-sys-*' -o -name 'openssl-src-*' \) 2>/dev/null); do
+            echo "-- $d --"
+            find "$d" -maxdepth 6 -name '*.a' 2>/dev/null
+          done
 
       - name: Upload Android prebuilts
         uses: actions/upload-artifact@v4
