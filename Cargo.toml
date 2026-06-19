@@ -7,19 +7,15 @@ version = "0.0.0"
 edition = "2021"
 
 [profile.release]
-# lto disabled on this branch: NDK llvm-strip can't process the LLVM
-# bitcode that cc-rs emits for C objects (libz-sys's adler32.o) under
-# LTO, so craby's post-build strip step fails. CARGO_PROFILE_RELEASE_LTO
-# in env doesn't propagate into cc-rs reliably; flipping it here is the
-# minimum invasive fix for the prebuilt-artifacts build.
-lto = false
+# Thin LTO threads the needle: full LTO embeds LLVM bitcode in cc-rs
+# C objects which the NDK llvm-strip can't process; LTO off leaves
+# cross-crate Rust calls as external relocations that on iOS/Xcode 26
+# trip the Apple linker (`reloc 1: symbol index out of range` in the
+# rustc-emitted .rcgu.o files). Thin LTO produces native ELF/Mach-O
+# objects AND consolidates cross-crate references, so both downstream
+# linkers stay happy.
+lto = "thin"
 codegen-units = 1
 opt-level = "z"
 strip = true
-# panic = "abort" instead of "unwind": with LTO disabled, the duplicated
-# CFI entries Rust emits across crates make Xcode 26's ld_prime hit
-# `findRealAtom` and ld_classic hit `cfiStartsArray`. Aborting on panic
-# drops the eh_frame tables Rust would otherwise generate, and the
-# remaining compact-unwind metadata is what the Apple linker actually
-# expects. Mobile apps panic-abort either way.
-panic = "abort"
+panic = "unwind"
