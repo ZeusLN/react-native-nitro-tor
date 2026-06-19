@@ -22,6 +22,11 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - name: Install autotools (libtor / openssl-src vendored build deps)
+        # macos-latest doesn't ship automake / autoconf / libtool / pkg-config,
+        # but libtor-src's autogen.sh runs aclocal in its build script.
+        run: brew install automake autoconf libtool pkg-config
+
       - name: Install Rust cross targets
         run: |
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
