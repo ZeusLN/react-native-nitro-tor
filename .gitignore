@@ -84,5 +84,7 @@ android/generated
 target/
 
 # JavaScript build output
-dist/
+# (vendor branch only: dist/ is checked in here so yarn can install
+# this fork from a GitHub URL without running a build step)
+# dist/
 .direnv/
