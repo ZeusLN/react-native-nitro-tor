@@ -7,7 +7,12 @@ version = "0.0.0"
 edition = "2021"
 
 [profile.release]
-lto = true
+# lto disabled on this branch: NDK llvm-strip can't process the LLVM
+# bitcode that cc-rs emits for C objects (libz-sys's adler32.o) under
+# LTO, so craby's post-build strip step fails. CARGO_PROFILE_RELEASE_LTO
+# in env doesn't propagate into cc-rs reliably; flipping it here is the
+# minimum invasive fix for the prebuilt-artifacts build.
+lto = false
 codegen-units = 1
 opt-level = "z"
 strip = true
