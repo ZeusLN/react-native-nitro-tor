@@ -91,27 +91,24 @@ jobs:
         run: |
           set +e
           NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
-          AAR="target/aarch64-linux-android/release/libreactnativenitrotor.a"
-          if [ ! -f "$AAR" ]; then
-            echo "Archive not produced: $AAR"
-            ls -la target/aarch64-linux-android/release/ 2>&1 | head
-            exit 0
-          fi
-          echo "=== Archive members matching adler ==="
-          "$NDK_BIN/llvm-ar" t "$AAR" | grep -i adler
+          echo "=== All adler32*.o files under target/ ==="
+          find target -name 'adler32*.o' 2>/dev/null
           echo
-          echo "=== Extracting adler32.o ==="
-          mkdir -p /tmp/extract && cd /tmp/extract
-          "$NDK_BIN/llvm-ar" x "$AAR" adler32.o
+          echo "=== Looking at libz-sys build out dir ==="
+          find target -type d -name 'libz-sys-*' 2>/dev/null
+          for ofile in $(find target -name 'adler32*.o' 2>/dev/null); do
+            echo
+            echo "=== $ofile ==="
+            echo "--- file ---"
+            file "$ofile"
+            echo "--- first 64 bytes ---"
+            xxd "$ofile" | head -4
+            echo "--- llvm-objdump --file-headers ---"
+            "$NDK_BIN/llvm-objdump" --file-headers "$ofile" 2>&1 | head -10
+          done
           echo
-          echo "=== file ==="
-          file adler32.o
-          echo
-          echo "=== first 64 bytes hex ==="
-          xxd adler32.o | head -4
-          echo
-          echo "=== llvm-objdump --file-headers ==="
-          "$NDK_BIN/llvm-objdump" --file-headers adler32.o 2>&1 | head -20
+          echo "=== libreactnativenitrotor.a presence ==="
+          find target -name 'libreactnativenitrotor.a' -exec ls -la {} \; 2>/dev/null
 
       - name: Upload Android prebuilts
         uses: actions/upload-artifact@v4
