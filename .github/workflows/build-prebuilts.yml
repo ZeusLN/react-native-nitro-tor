@@ -78,13 +78,21 @@ jobs:
       - name: Cross-compile all targets via craby
         run: yarn craby build
         env:
-          # Disable LTO in the release profile. The workspace's [profile.release]
-          # sets lto = true, which makes cc-rs emit LLVM bitcode for C objects
-          # (e.g. libz-sys's zlib). Android NDK's llvm-strip can't process the
-          # bitcode and bails on the first such member ("adler32.o: not
-          # recognized as a valid object file"). Disabling LTO keeps the C
-          # objects as plain native ELF so the strip step succeeds.
+          # Setting profile.release.lto = false in Cargo.toml and
+          # CARGO_PROFILE_RELEASE_LTO=false in env didn't actually stop cc-rs
+          # from emitting LLVM bitcode for the C deps (libz-sys's adler32.o
+          # came out as LLVM IR bitcode under all three). Some part of the
+          # libz-sys / openssl-src / libtor-sys build chain is forcing -flto
+          # regardless of Rust's profile.
+          #
+          # CFLAGS_<target> values get appended after cc-rs's own flags, so
+          # `-fno-lto` lands after any `-flto` and clang honors the last one,
+          # producing native object files that NDK's llvm-strip can handle.
           CARGO_PROFILE_RELEASE_LTO: "false"
+          CFLAGS_aarch64_linux_android: "-fno-lto"
+          CFLAGS_armv7_linux_androideabi: "-fno-lto"
+          CFLAGS_i686_linux_android: "-fno-lto"
+          CFLAGS_x86_64_linux_android: "-fno-lto"
 
       - name: Diagnose adler32.o
         if: always()
