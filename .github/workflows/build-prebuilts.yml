@@ -100,26 +100,26 @@ jobs:
           set +e
           NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
           AR="$NDK_BIN/llvm-ar"
-          TARGET_DIR="target/aarch64-linux-android/release"
-          echo "=== Searching all .a archives for adler32.o membership ==="
+          echo "=== All .a archives mentioning anything matching adler ==="
           find target/aarch64-linux-android -name '*.a' 2>/dev/null | while read a; do
-            if "$AR" t "$a" 2>/dev/null | grep -qE '^adler32(_simd)?\.o$'; then
-              echo "HIT: $a"
-              "$AR" t "$a" | grep adler
+            hits=$("$AR" t "$a" 2>/dev/null | grep -i adler)
+            if [ -n "$hits" ]; then
+              echo "ARCHIVE: $a"
+              echo "$hits" | sed 's/^/  /'
               echo
             fi
           done
           echo
-          echo "=== libz-sys-* build out dir contents ==="
-          for d in $(find "$TARGET_DIR/build" -maxdepth 1 -type d -name 'libz-sys-*' 2>/dev/null); do
-            echo "-- $d --"
-            find "$d" -maxdepth 4 -name '*.a' -o -name 'adler32*.o' 2>/dev/null
-          done
+          echo "=== Same scan for any .o with 'adler' in the name under target/ ==="
+          find target/aarch64-linux-android -name '*adler*' 2>/dev/null | head -20
           echo
-          echo "=== libtor-sys-* / libtor-src-* / libevent-src-* / openssl-sys-* build out for any .a ==="
-          for d in $(find "$TARGET_DIR/build" -maxdepth 1 -type d \( -name 'libtor-sys-*' -o -name 'libtor-src-*' -o -name 'libevent-src-*' -o -name 'openssl-sys-*' -o -name 'openssl-src-*' \) 2>/dev/null); do
+          echo "=== libz-sys-* contents (full tree, .o/.a/.so/.dylib) ==="
+          for d in $(find target/aarch64-linux-android/release/build -maxdepth 1 -type d -name 'libz-sys-*' 2>/dev/null); do
             echo "-- $d --"
-            find "$d" -maxdepth 6 -name '*.a' 2>/dev/null
+            find "$d" \( -name '*.o' -o -name '*.a' -o -name '*.so' -o -name '*.dylib' \) 2>/dev/null
+            echo "-- stdout --"
+            cat "$d/output" 2>/dev/null | head -40 || echo "no output file"
+            echo
           done
 
       - name: Upload Android prebuilts
