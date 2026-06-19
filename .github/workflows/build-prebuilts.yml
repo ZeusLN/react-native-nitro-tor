@@ -1,0 +1,64 @@
+name: Build Prebuilts (ZeusLN fork)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - prebuilt-artifacts
+
+jobs:
+  # Single macos job — Apple Silicon runner can host both iOS and Android
+  # cross-compiles (NDK ships an x86_64 toolchain that runs fine via Rosetta).
+  # `yarn craby build` walks all 7 targets in one shot.
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Rust cross targets
+        run: |
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+      - name: Set up NDK shims for legacy per-arch binutils names
+        # NDK 23+ ships unified `llvm-ar` / `llvm-ranlib` etc., but the
+        # vendored openssl autotools build inside libtor-sys still calls
+        # the legacy per-arch names (e.g. `aarch64-linux-android-ranlib`).
+        # Synthesize the wrappers via symlinks and prepend to PATH.
+        run: |
+          NDK_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
+          mkdir -p /tmp/ndk-shims
+          for arch in aarch64-linux-android armv7-linux-androideabi arm-linux-androideabi i686-linux-android x86_64-linux-android; do
+            for tool in ranlib ar nm as strip; do
+              ln -sf "$NDK_BIN/llvm-$tool" "/tmp/ndk-shims/${arch}-${tool}"
+            done
+          done
+          echo "/tmp/ndk-shims" >> "$GITHUB_PATH"
+          echo "$NDK_BIN" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Cross-compile all targets via craby
+        run: yarn craby build
+
+      - name: Upload Android prebuilts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-prebuilts
+          path: android/src/main/jni/libs/
+          if-no-files-found: error
+
+      - name: Upload iOS prebuilts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-prebuilts
+          path: ios/framework/
+          if-no-files-found: error
