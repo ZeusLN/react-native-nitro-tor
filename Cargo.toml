@@ -7,14 +7,18 @@ version = "0.0.0"
 edition = "2021"
 
 [profile.release]
-# Thin LTO threads the needle: full LTO embeds LLVM bitcode in cc-rs
-# C objects which the NDK llvm-strip can't process; LTO off leaves
-# cross-crate Rust calls as external relocations that on iOS/Xcode 26
-# trip the Apple linker (`reloc 1: symbol index out of range` in the
-# rustc-emitted .rcgu.o files). Thin LTO produces native ELF/Mach-O
-# objects AND consolidates cross-crate references, so both downstream
-# linkers stay happy.
-lto = "thin"
+# Default to fat LTO (matches upstream 0.5.3 and what Xcode 26's ld
+# expects — with LTO off or thin, rustc emits a relocation form that
+# Apple's linker rejects with "symbol index out of range" /
+# `findRealAtom` / `cfiStartsArray` assertions inside the
+# reactnativenitrotor.rcgu.o; otool confirms the difference is
+# missing PAGE21/PAGOF12 and a synthetic type-15 reloc instead).
+#
+# Android builds must override this with CARGO_PROFILE_RELEASE_LTO=false
+# at invocation time, because with fat LTO cc-rs bakes LLVM bitcode
+# into libz-sys's adler32.o etc. and the NDK's llvm-strip can't
+# process bitcode-laden archive members. See build script docs.
+lto = true
 codegen-units = 1
 opt-level = "z"
 strip = true
